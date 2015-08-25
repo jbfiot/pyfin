@@ -124,9 +124,10 @@ class Option(Instrument):
             OptionMeasure.GAMMA: gamma,
         }
 
-    def binomial_tree(self, num_steps=None, sens_degree=2):
+    def binomial_tree(self, num_steps=None, sens_degree=2, return_early_exer=False):
         val_num_steps = num_steps or DEFAULT_BINOMIAL_TREE_NUM_STEPS
         val_cache = {}
+        early_exer = []
 
         dt = float(self.mat) / val_num_steps
         up_fact = exp(self.vol * (dt ** 0.5))
@@ -167,6 +168,8 @@ class Option(Instrument):
                     pv = exp(-self.riskless_rate * dt) * fv
                     if self.exer_type == OptionExerciseType.AMERICAN:
                         val = max(pv, exer_profit)
+                        if exer_profit > pv:
+                            early_exer.append(value_cache_key)
                     else:  # exer_type == OptionExerciseType.EUROPEAN
                         val = pv
 
@@ -188,7 +191,7 @@ class Option(Instrument):
             delta_down = (node_value(2, 1, 1) - node_value(2, 0, 2)) / (bin_spot0 * up_fact - bin_spot0 * down_fact)
             gamma = (delta_up - delta_down) / ((bin_spot0 * up_fact * up_fact - bin_spot0 * down_fact * down_fact) / 2)
 
-        return {
+        opt_measures = {
             OptionMeasure.VALUE: val,
             OptionMeasure.DELTA: delta,
             OptionMeasure.THETA: theta,
@@ -196,6 +199,11 @@ class Option(Instrument):
             OptionMeasure.VEGA: vega,
             OptionMeasure.GAMMA: gamma,
         }
+    
+        if return_early_exer:
+            return opt_measures, early_exer
+        else:
+            return opt_measures
 
     def monte_carlo(self, num_steps=None, num_paths=None, random_seed=None, sens_degree=2):
         val_num_steps = num_steps or DEFAULT_MONTE_CARLO_NUM_STEPS
